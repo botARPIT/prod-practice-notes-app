@@ -1,4 +1,6 @@
+import type { RequestHandler } from 'express';
 import pino from 'pino';
 declare const logger: pino.Logger<never, boolean>;
-export default logger;
+declare const httpLogger: RequestHandler;
+export { logger, httpLogger };
 //# sourceMappingURL=logger.d.ts.map
