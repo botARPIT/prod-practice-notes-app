@@ -4,7 +4,6 @@ import { PrismaClient } from '../generated/prisma/client.js'
 import { config } from './config.js'
 
 const prismaDbUrl = config.database_url
-console.log(prismaDbUrl)
 const pool = new Pool({
     connectionString: prismaDbUrl,
     ssl: {
