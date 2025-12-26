@@ -12,7 +12,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
             })
             .catch((err) => {
                 clearTimeout(timer);
-                reject(err)
+                reject(err) 
             })
     })
 }

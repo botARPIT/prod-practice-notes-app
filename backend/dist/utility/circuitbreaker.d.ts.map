@@ -1,0 +1,1 @@
+{"version":3,"file":"circuitbreaker.d.ts","sourceRoot":"","sources":["../../src/utility/circuitbreaker.ts"],"names":[],"mappings":"AAIA,qBAAa,mBAAmB;IAC5B,OAAO,CAAC,QAAQ,CAAK;IACrB,OAAO,CAAC,KAAK,CAAmB;IAChC,OAAO,CAAC,QAAQ,CAAC,gBAAgB,CAAS;gBAE9B,gBAAgB,SAAI;IAI1B,IAAI,CAAC,CAAC,EAAE,EAAE,EAAE,MAAM,OAAO,CAAC,CAAC,CAAC,GAAG,OAAO,CAAC,CAAC,CAAC;CA2BlD;AAOD,wBAAsB,eAAe,iBAQpC"}

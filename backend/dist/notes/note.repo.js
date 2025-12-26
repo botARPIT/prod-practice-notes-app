@@ -1,8 +1,9 @@
 // Create prisma client
 import { prisma } from '../config/prisma.js';
+import { withTimeout } from '../utility/backpressure.js';
 async function createNote(note) {
     try {
-        const createdNote = await prisma.note.create({
+        return await withTimeout(prisma.note.create({
             data: {
                 note: note,
             },
@@ -10,12 +11,13 @@ async function createNote(note) {
                 note: true,
                 // author: true
             }
-        });
-        return createdNote;
+        }), 800);
     }
     catch (error) {
-        console.log(error);
-        process.exit(1);
+        if (error instanceof Error && error.message === "DB_ACQUIRE_TIMEOUT") {
+            throw new Error("DB_BACKPRESSURE");
+        }
+        throw error;
     }
 }
 export { createNote };
