@@ -6,25 +6,26 @@ import { E_ALREADY_LOCKED, Semaphore, tryAcquire } from 'async-mutex' // Use to 
 const dbSemaphore = new Semaphore(2)
 let allowedLimit = 0
 async function createNote(note: string) {
+
+    // Used to immediately reject the request if semaphore is unavailable
+    // await tryAcquire(dbSemaphore).runExclusive(async () => {
+    //     const createdNote = await withTimeout(prisma.note.create({
+    //         data: {
+    //             note: note,
+    //         },
+    //         select: {
+    //             note: true,
+    //             // author: true
+    //         }
+    //     }), 800
+    //     )
+    //     return createdNote
+    // })
+    if (allowedLimit > 5) {
+        throw new Error("CONCURRENCY LIMIT HIT, APPLYING BACKPRESSURE")
+    }
+    allowedLimit++;
     try {
-        // Used to immediately reject the request if semaphore is unavailable
-        // await tryAcquire(dbSemaphore).runExclusive(async () => {
-        //     const createdNote = await withTimeout(prisma.note.create({
-        //         data: {
-        //             note: note,
-        //         },
-        //         select: {
-        //             note: true,
-        //             // author: true
-        //         }
-        //     }), 800
-        //     )
-        //     return createdNote
-        // })
-        if (allowedLimit > 5) {
-            throw new Error("CONCURRENCY LIMIT HIT, APPLYING BACKPRESSURE")
-        }
-        allowedLimit++;
         const createdNote = await withTimeout(prisma.note.create({
             data: {
                 note: note,
@@ -35,17 +36,17 @@ async function createNote(note: string) {
             }
         }), 800
         )
-        allowedLimit--;
         return createdNote
     } catch (error) {
         if (error === E_ALREADY_LOCKED) {
             throw new Error("CONCURRENCY LIMIT HIT, APPLYING BACKPRESSURE")
         } else if (error instanceof Error && error.message === "DB_ACQUIRE_TIMEOUT") {
-            allowedLimit--;
             throw new Error("DB TIMEOUT")
         }
-        allowedLimit--;
+
         throw new Error("Unexpected Error occured")
+    } finally {
+        allowedLimit--;
     }
 }
 
