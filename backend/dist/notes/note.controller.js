@@ -14,9 +14,15 @@ const createNote = async (req, res) => {
         if (error instanceof Error && error.message === "DB_BACKPRESSURE") {
             res.status(503).json({
                 success: false,
-                message: "Service temporarily overloaded. Try again later.",
+                message: "Database operation timeout. Try again later.",
             });
             return;
+        }
+        else if (error instanceof Error && error.message === "CONCURRENCY LIMIT HIT, APPLYING BACKPRESSURE") {
+            res.status(503).json({
+                success: false,
+                message: "Service temporarily overloaded. Try again later."
+            });
         }
         throw error;
     }
