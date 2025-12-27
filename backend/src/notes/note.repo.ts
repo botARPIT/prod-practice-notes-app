@@ -8,37 +8,26 @@ const dbSemaphore = new Semaphore(2)
 async function createNote(note: string) {
     try {
         // Used to immediately reject the request if semaphore is unavailable
-        await tryAcquire(dbSemaphore).acquire()
+        await tryAcquire(dbSemaphore).runExclusive(async () => {
+            const createdNote = await withTimeout(prisma.note.create({
+                data: {
+                    note: note,
+                },
+                select: {
+                    note: true,
+                    // author: true
+                }
+            }), 800
+            )
+            return createdNote
+        })
     } catch (error) {
         if (error === E_ALREADY_LOCKED) {
             throw new Error("CONCURRENCY LIMIT HIT, APPLYING BACKPRESSURE")
-        }
-        throw error
-    }
-    let release;
-    try {
-        const [_, _release] = await dbSemaphore.acquire()
-        release = _release;
-
-        const createdNote = await withTimeout(prisma.note.create({
-            data: {
-                note: note,
-            },
-            select: {
-                note: true,
-                // author: true
-            }
-        }), 800
-        )
-        return createdNote
-    }
-    catch (error) {
-        if (error instanceof Error && error.message === "DB_ACQUIRE_TIMEOUT") {
+        } else if (error instanceof Error && error.message === "DB_ACQUIRE_TIMEOUT") {
             throw new Error("DB TIMEOUT")
         }
         throw new Error("Unexpected Error occured")
-    } finally {
-        release && release()
     }
 }
 
