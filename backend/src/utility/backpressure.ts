@@ -1,4 +1,4 @@
-// This is to implement backpressure on concurrent db connections when connection pool is already busy
+// This is to implement timeout based abadonment of the request not true backpressure, this is implicit backpressure where the client is notified not to wait further after timer expires
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
     return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
@@ -12,9 +12,9 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
             })
             .catch((err) => {
                 clearTimeout(timer);
-                reject(err) 
+                reject(err)
             })
     })
 }
 
-export { withTimeout }
+export { withTimeout }  
