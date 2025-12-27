@@ -1,50 +1,71 @@
-import { logger } from "../logger.js";
+type State = "CLOSED" | "OPEN" | "HALF_OPEN";
 
-type State = "CLOSED" | "OPEN"
+export class CircuitBreaker {
+  private state: State = "CLOSED";
+  private failures = 0;
+  private lastFailureTime = 0;
+  private probeInFlight = 0;
 
-export class NaiveCircuitBreaker {
-    private failures = 0;
-    private state: State = "CLOSED";
-    private readonly failureThreshold: number;
+  constructor(
+    private readonly failureThreshold = 5,
+    private readonly cooldownMs = 10_000,
+    private readonly maxHalfOpenProbes = 1
+  ) {}
 
-    constructor(failureThreshold = 5) {
-        this.failureThreshold = failureThreshold
+  async exec<T>(fn: () => Promise<T>): Promise<T> {
+    const now = Date.now();
+
+    if (this.state === "OPEN") {
+      if (now - this.lastFailureTime >= this.cooldownMs) {
+        this.state = "HALF_OPEN";
+      } else {
+        throw new Error("Circuit OPEN");
+      }
     }
 
-    async exec<T>(fn: () => Promise<T>): Promise<T> {
-        if (this.state == "OPEN") {
-            throw new Error("Circuit is open")
-        }
-        console.log("Inside exec function")
-        console.log("Value of failure is", this.failures)
-        try {
-            const result = await fn()
-            console.log("using await and result is: ", result)
-            return result
-            // return fn().then(result => {
-            //     console.log("inside try and returning the result", result)
-            //     return result
-            // })
-        } catch (err) {
-            logger.warn("Error in try block")
-            this.failures++
-
-
-            if (this.failures >= this.failureThreshold) {
-                this.state = 'OPEN'
-                logger.warn("Circuit is opened")
-            }
-
-            throw err
-        }
+    if (this.state === "HALF_OPEN") {
+      if (this.probeInFlight >= this.maxHalfOpenProbes) {
+        throw new Error("Circuit HALF_OPEN (probe limit)");
+      }
+      this.probeInFlight++;
     }
+
+    try {
+      const result = await fn();
+
+      this.onSuccess();
+      return result;
+    } catch (err) {
+      this.onFailure();
+      throw err;
+    } finally {
+      if (this.state === "HALF_OPEN") {
+        this.probeInFlight--;
+      }
+    }
+  }
+
+  private onSuccess() {
+    this.failures = 0;
+    if (this.state === "HALF_OPEN") {
+      this.state = "CLOSED";
+    }
+  }
+
+  private onFailure() {
+    this.failures++;
+    this.lastFailureTime = Date.now();
+
+    if (this.failures >= this.failureThreshold) {
+      this.state = "OPEN";
+    }
+  }
 }
-
 
 
 // Async function to use to call the external api
 import axios from 'axios'
-const breaker = new NaiveCircuitBreaker(5)
+const breaker = new CircuitBreaker(5, 10_000, 2)
 export async function callExternalApi() {
     return await breaker.exec(async () => {
         console.log("Inside call external api function")
