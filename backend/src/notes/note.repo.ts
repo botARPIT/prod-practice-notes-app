@@ -4,6 +4,7 @@ import { withTimeout } from '../utility/backpressure.js'
 import { E_ALREADY_LOCKED, Semaphore, tryAcquire } from 'async-mutex' // Use to apply implicit backpressure, by denying the request upfront
 import { ConcurrencyLimiter } from '../utility/concurrencyLimitter.js'
 const dbLimitter = new ConcurrencyLimiter(5)
+const dbSemaphore = new Semaphore(5)
 async function createNote(note: string) {
 
     // Used to immediately reject the request if semaphore is unavailable
@@ -20,7 +21,13 @@ async function createNote(note: string) {
     //     )
     //     return createdNote
     // })
-    const release = await dbLimitter.acquire()
+    const value = dbSemaphore.getValue()
+    if (value === 0) {
+        throw new Error("RATE LIMIT EXCEEDED")
+
+    }
+    await dbSemaphore.acquire()
+
     try {
 
         const createdNote = await withTimeout(prisma.note.create({
@@ -43,7 +50,7 @@ async function createNote(note: string) {
 
         throw new Error("Unexpected Error occured")
     } finally {
-        release()
+        dbSemaphore.release()
     }
 }
 
