@@ -4,32 +4,41 @@ import { withTimeout } from '../utility/backpressure.js'
 import { E_ALREADY_LOCKED, Semaphore, tryAcquire } from 'async-mutex' // Use to apply implicit backpressure, by denying the request upfront
 
 const dbSemaphore = new Semaphore(2)
-const nonBlockingSemaphore = tryAcquire(dbSemaphore)
+
 async function createNote(note: string) {
-
     try {
-        await nonBlockingSemaphore.runExclusive(async () => {
-            const createdNote = await withTimeout(prisma.note.create({
-                data: {
-                    note: note,
-                },
-                select: {
-                    note: true,
-                    // author: true
-                }
-            }), 800
-            )
-            return createdNote
-        })
-
-
+        // Used to immediately reject the request if semaphore is unavailable
+        await tryAcquire(dbSemaphore).acquire()
     } catch (error) {
-        if (error instanceof Error && error.message === "DB_ACQUIRE_TIMEOUT") {
-            throw new Error("DB TIMEOUT")
-        } else if (error === E_ALREADY_LOCKED) {
+        if (error === E_ALREADY_LOCKED) {
             throw new Error("CONCURRENCY LIMIT HIT, APPLYING BACKPRESSURE")
         }
+        throw error
+    }
+    let release;
+    try {
+        const [_, _release] = await dbSemaphore.acquire()
+        release = _release;
+
+        const createdNote = await withTimeout(prisma.note.create({
+            data: {
+                note: note,
+            },
+            select: {
+                note: true,
+                // author: true
+            }
+        }), 800
+        )
+        return createdNote
+    }
+    catch (error) {
+        if (error instanceof Error && error.message === "DB_ACQUIRE_TIMEOUT") {
+            throw new Error("DB TIMEOUT")
+        }
         throw new Error("Unexpected Error occured")
+    } finally {
+        release && release()
     }
 }
 
